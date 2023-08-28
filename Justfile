@@ -24,6 +24,11 @@ clean:
 install:
 	pip install -e .[lint,test,docs]
 
+# install dependencies, setup pre-commit,
+setup-dev:
+	just install
+	pre-commit install
+
 # lint, format, and check all files
 lint:
 	pre-commit run --all-files
