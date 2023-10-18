@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 """Top-level package for bioio_tiff_glob."""
@@ -12,7 +13,7 @@ except PackageNotFoundError:
 __author__ = "bioio-devs"
 __email__ = "brian.whitney@alleninstitute.org"
 
-from .reader_metadata import Reader
+from .reader import Reader
 from .reader_metadata import ReaderMetadata
 
 __all__ = ["Reader", "ReaderMetadata"]
