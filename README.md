@@ -1,7 +1,7 @@
 # bioio-tiff-glob
 
-[![Build Status](https://github.com/bioio-devs/bioio-tiff-glob/workflows/CI/badge.svg)](https://github.com/bioio-devs/bioio-tiff-glob/actions)
-[![Documentation](https://github.com/bioio-devs/bioio-tiff-glob/workflows/Documentation/badge.svg)](https://bioio-devs.github.io/bioio-tiff-glob)
+[![Build Status](https://github.com/bioio-devs/bioio-tiff-glob/actions/workflows/ci.yml/badge.svg)](https://github.com/bioio-devs/bioio-tiff-glob/actions)
+[![Documentation](https://github.com/bioio-devs/bioio-tiff-glob/actions/workflows/docs.yml/badge.svg)](https://bioio-devs.github.io/bioio-tiff-glob)
 
 A BioIo reader for reading Tiff Glob images
 
