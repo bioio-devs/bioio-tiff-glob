@@ -123,9 +123,10 @@ class Reader(reader.Reader):
         try:
             with fs.open(path) as open_resource:
                 with TiffFile(open_resource, is_mmstack=False):
+                    Reader(glob_in=[path], **kwargs)
                     return True
 
-        except (TiffFileError, TypeError):
+        except (TiffFileError, TypeError) or exceptions.UnsupportedFileFormatError:
             return False
 
     def __init__(
@@ -144,147 +145,151 @@ class Reader(reader.Reader):
         fs_kwargs: Dict[str, Any] = {},
         **kwargs: Any,
     ):
-        # Assemble glob list if given a string
-        if isinstance(glob_in, str):
-            file_series = pd.Series(glob.glob(glob_in))
-        elif isinstance(glob_in, Path) and "*" in str(glob_in):
-            file_series = pd.Series(glob.glob(str(glob_in)))
-        elif isinstance(glob_in, pd.Series):
-            # Ensure all of our indices line up
-            file_series = glob_in.reset_index(drop=True, inplace=False)
-        elif isinstance(glob_in, Iterable):
-            file_series = pd.Series(glob_in)
-        else:
-            raise TypeError(f"Invalid type glob_in - got type {type(glob_in)}")
+        try:
+            self._path = None
 
-        if len(file_series) == 0:
-            raise ValueError("No files found matching glob pattern")
+            # Assemble glob list if given a string
+            if isinstance(glob_in, str):
+                file_series = pd.Series(glob.glob(glob_in))
+            elif isinstance(glob_in, Path) and "*" in str(glob_in):
+                file_series = pd.Series(glob.glob(str(glob_in)))
+            elif isinstance(glob_in, pd.Series):
+                # Ensure all of our indices line up
+                file_series = glob_in.reset_index(drop=True, inplace=False)
+            elif isinstance(glob_in, Iterable):
+                file_series = pd.Series(glob_in)
+            else:
+                raise TypeError(f"Invalid type glob_in - got type {type(glob_in)}")
 
-        self.scene_glob_character = scene_glob_character
+            if len(file_series) == 0:
+                raise ValueError("No files found matching glob pattern")
 
-        if indexer is None:
-            series_idx = [
-                self.scene_glob_character,
-                dimensions.DimensionNames.Time,
-                dimensions.DimensionNames.Channel,
-                dimensions.DimensionNames.SpatialZ,
-            ]
+            self.scene_glob_character = scene_glob_character
 
-            # By default we will attempt to parse 4 numbers out of the filename
-            # and assign them in order to be the corresponding S, T, C, and Z indices.
-            # So indexer("path/to/data/S0_T1_C2_Z3.tif") returns
-            # pd.Series([0,1,2,3], index=['S','T','C', 'Z'])
-            def indexer(x: str) -> pd.Series:
-                return pd.Series(
-                    re.findall(r"\d+", Path(x).name), index=series_idx
-                ).astype(int)
+            if indexer is None:
+                series_idx = [
+                    self.scene_glob_character,
+                    dimensions.DimensionNames.Time,
+                    dimensions.DimensionNames.Channel,
+                    dimensions.DimensionNames.SpatialZ,
+                ]
 
-        if callable(indexer):
-            self._all_files = file_series.apply(indexer)
-            self._all_files["filename"] = file_series
-        elif isinstance(indexer, pd.DataFrame):
-            # make a copy of the indexing dataframe and reset it index
-            # to ensure that we don't generate nans when aligning with
-            # file_series.
-            self._all_files = indexer.reset_index(drop=True, inplace=False)
-            self._all_files["filename"] = file_series
+                # By default we will attempt to parse 4 numbers out of the filename
+                # and assign them in order to be the corresponding S, T, C, and Z indices.
+                # So indexer("path/to/data/S0_T1_C2_Z3.tif") returns
+                # pd.Series([0,1,2,3], index=['S','T','C', 'Z'])
+                def indexer(x: str) -> pd.Series:
+                    return pd.Series(
+                        re.findall(r"\d+", Path(x).name), index=series_idx
+                    ).astype(int)
 
-        # If a dim doesn't exist on the file set the column value for that dim to zero.
-        # If the dim is present, add it to the sort order. Because we are using
-        # the default dimension ordering, this will naturally create a sort order
-        # based off the standard dimension order.
-        sort_order = []
-        for dim in dimensions.DEFAULT_DIMENSION_ORDER_LIST_WITH_SAMPLES:
-            if dim not in self._all_files.columns and dim not in single_file_dims:
-                self._all_files[dim] = 0
-            if dim in self._all_files.columns:
-                sort_order.append(dim)
+            if callable(indexer):
+                self._all_files = file_series.apply(indexer)
+                self._all_files["filename"] = file_series
+            elif isinstance(indexer, pd.DataFrame):
+                # make a copy of the indexing dataframe and reset it index
+                # to ensure that we don't generate nans when aligning with
+                # file_series.
+                self._all_files = indexer.reset_index(drop=True, inplace=False)
+                self._all_files["filename"] = file_series
 
-        self._all_files = self._all_files.sort_values(sort_order).reset_index(drop=True)
+            # If a dim doesn't exist on the file set the column value for that dim to zero.
+            # If the dim is present, add it to the sort order. Because we are using
+            # the default dimension ordering, this will naturally create a sort order
+            # based off the standard dimension order.
+            sort_order = []
+            for dim in dimensions.DEFAULT_DIMENSION_ORDER_LIST_WITH_SAMPLES:
+                if dim not in self._all_files.columns and dim not in single_file_dims:
+                    self._all_files[dim] = 0
+                if dim in self._all_files.columns:
+                    sort_order.append(dim)
 
-        # run tests on a single file (?)
-        self._fs, self._path = io.pathlike_to_fs(
-            self._all_files.iloc[0].filename,
-            fs_kwargs=fs_kwargs,
-        )
+            self._all_files = self._all_files.sort_values(sort_order).reset_index(drop=True)
 
-        # Store params
-        if isinstance(chunk_dims, str):
-            self.chunk_dims = list(chunk_dims)
-        elif isinstance(chunk_dims, list) and isinstance(chunk_dims[0], str):
-            self.chunk_dims = chunk_dims
-        else:
-            raise ValueError("chunk_dims must be str or list of str")
+            # run tests on a single file (?)
+            self._fs, self._path = io.pathlike_to_fs(
+                self._all_files.iloc[0].filename,
+                fs_kwargs=fs_kwargs,
+            )
 
-        # Run basic checks on dims and channel names
-        if isinstance(dim_order, list):
-            if len(dim_order) != len(self.scenes):
-                raise exceptions.ConflictingArgumentsError(
-                    f"Number of dimension strings provided does not match the "
-                    f"number of scenes found in the file. "
-                    f"Number of scenes: {len(self.scenes)}, "
-                    f"Number of provided dimension order strings: {len(dim_order)}"
-                )
+            # Store params
+            if isinstance(chunk_dims, str):
+                self.chunk_dims = list(chunk_dims)
+            elif isinstance(chunk_dims, list) and isinstance(chunk_dims[0], str):
+                self.chunk_dims = chunk_dims
+            else:
+                raise ValueError("chunk_dims must be str or list of str")
 
-        self._channel_names = channel_names
-
-        # If provided a list
-        if isinstance(channel_names, list):
-            # If provided a list of lists
-            if len(channel_names) > 0 and isinstance(channel_names[0], list):
-                # Ensure that the outer list is the number of scenes
-                if len(channel_names) != len(self.scenes):
+            # Run basic checks on dims and channel names
+            if isinstance(dim_order, list):
+                if len(dim_order) != len(self.scenes):
                     raise exceptions.ConflictingArgumentsError(
-                        f"Number of channel name lists provided does not match the "
+                        f"Number of dimension strings provided does not match the "
                         f"number of scenes found in the file. "
                         f"Number of scenes: {len(self.scenes)}, "
-                        f"Provided channel name lists: {dim_order}"
+                        f"Number of provided dimension order strings: {len(dim_order)}"
                     )
+
             self._channel_names = channel_names
 
-        for dim in dimensions.REQUIRED_CHUNK_DIMS:
-            if dim not in self.chunk_dims:
-                self.chunk_dims.append(dim)
+            # If provided a list
+            if isinstance(channel_names, list):
+                # If provided a list of lists
+                if len(channel_names) > 0 and isinstance(channel_names[0], list):
+                    # Ensure that the outer list is the number of scenes
+                    if len(channel_names) != len(self.scenes):
+                        raise exceptions.ConflictingArgumentsError(
+                            f"Number of channel name lists provided does not match the "
+                            f"number of scenes found in the file. "
+                            f"Number of scenes: {len(self.scenes)}, "
+                            f"Provided channel name lists: {dim_order}"
+                        )
+                self._channel_names = channel_names
 
-        # Safety measure / "feature"
-        self.chunk_dims = [d.upper() for d in self.chunk_dims]
+            for dim in dimensions.REQUIRED_CHUNK_DIMS:
+                if dim not in self.chunk_dims:
+                    self.chunk_dims.append(dim)
 
-        if dim_order is not None:
-            self._dim_order = dim_order
-        else:
-            self._dim_order = "".join(
-                d
-                for d in dimensions.DEFAULT_DIMENSION_ORDER
-                if d in self._all_files.columns or d in self.chunk_dims
+            # Safety measure / "feature"
+            self.chunk_dims = [d.upper() for d in self.chunk_dims]
+
+            if dim_order is not None:
+                self._dim_order = dim_order
+            else:
+                self._dim_order = "".join(
+                    d
+                    for d in dimensions.DEFAULT_DIMENSION_ORDER
+                    if d in self._all_files.columns or d in self.chunk_dims
+                )
+
+            if single_file_shape is None:
+                with self._fs.open(self._path) as open_resource:
+                    with TiffFile(open_resource, is_mmstack=False) as tiff:
+                        self._single_file_shape = tiff.series[0].shape
+
+            else:
+                self._single_file_shape = single_file_shape
+
+            if len(single_file_dims) != len(self._single_file_shape):
+                raise exceptions.ConflictingArgumentsError(
+                    f"Number of single file dimensions does not match the"
+                    f"number of dimensions in a test file. "
+                    f"Number of dimensions in file: {len(self._single_file_shape)}, "
+                    f"Provided number of dimensions: {len(single_file_dims)}."
+                )
+
+            else:
+                self._single_file_dims = list(single_file_dims)
+
+            self._single_file_sizes = dict(
+                zip(self._single_file_dims, self._single_file_shape)
             )
-
-        if single_file_shape is None:
-            with self._fs.open(self._path) as open_resource:
-                with TiffFile(open_resource, is_mmstack=False) as tiff:
-                    self._single_file_shape = tiff.series[0].shape
-
-        else:
-            self._single_file_shape = single_file_shape
-
-        if len(single_file_dims) != len(self._single_file_shape):
-            raise exceptions.ConflictingArgumentsError(
-                f"Number of single file dimensions does not match the"
-                f"number of dimensions in a test file. "
-                f"Number of dimensions in file: {len(self._single_file_shape)}, "
-                f"Provided number of dimensions: {len(single_file_dims)}."
-            )
-
-        else:
-            self._single_file_dims = list(single_file_dims)
-
-        self._single_file_sizes = dict(
-            zip(self._single_file_dims, self._single_file_shape)
-        )
-        # Enforce valid image
-        if not self._is_supported_image(self._fs, self._path):
+        except Exception as e:
+            # Raise a generic error with more context
             raise exceptions.UnsupportedFileFormatError(
-                self.__class__.__name__, self._path
-            )
+                self.__class__.__name__,
+                self._path if self._path else "Unknown path"
+            ) from e
 
     @property
     def scenes(self) -> Tuple[str, ...]:
