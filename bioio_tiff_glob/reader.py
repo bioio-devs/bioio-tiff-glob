@@ -146,8 +146,6 @@ class Reader(reader.Reader):
         **kwargs: Any,
     ):
         try:
-            self._path = None
-
             # Assemble glob list if given a string
             if isinstance(glob_in, str):
                 file_series = pd.Series(glob.glob(glob_in))
@@ -175,8 +173,8 @@ class Reader(reader.Reader):
                 ]
 
                 # By default we will attempt to parse 4 numbers out of the filename
-                # and assign them in order to be the corresponding S, T, C, and Z indices.
-                # So indexer("path/to/data/S0_T1_C2_Z3.tif") returns
+                # and assign them in order to be the corresponding S, T, C, and Z
+                # indices. So indexer("path/to/data/S0_T1_C2_Z3.tif") returns
                 # pd.Series([0,1,2,3], index=['S','T','C', 'Z'])
                 def indexer(x: str) -> pd.Series:
                     return pd.Series(
@@ -193,10 +191,10 @@ class Reader(reader.Reader):
                 self._all_files = indexer.reset_index(drop=True, inplace=False)
                 self._all_files["filename"] = file_series
 
-            # If a dim doesn't exist on the file set the column value for that dim to zero.
-            # If the dim is present, add it to the sort order. Because we are using
-            # the default dimension ordering, this will naturally create a sort order
-            # based off the standard dimension order.
+            # If a dim doesn't exist on the file set the column value for that dim to
+            # zero. If the dim is present, add it to the sort order. Because we are
+            # using the default dimension ordering, this will naturally create a sort
+            # order based off the standard dimension order.
             sort_order = []
             for dim in dimensions.DEFAULT_DIMENSION_ORDER_LIST_WITH_SAMPLES:
                 if dim not in self._all_files.columns and dim not in single_file_dims:
@@ -204,7 +202,9 @@ class Reader(reader.Reader):
                 if dim in self._all_files.columns:
                     sort_order.append(dim)
 
-            self._all_files = self._all_files.sort_values(sort_order).reset_index(drop=True)
+            self._all_files = self._all_files.sort_values(sort_order).reset_index(
+                drop=True
+            )
 
             # run tests on a single file (?)
             self._fs, self._path = io.pathlike_to_fs(
@@ -287,8 +287,7 @@ class Reader(reader.Reader):
         except Exception as e:
             # Raise a generic error with more context
             raise exceptions.UnsupportedFileFormatError(
-                self.__class__.__name__,
-                self._path if self._path else "Unknown path"
+                self.__class__.__name__, self._path if self._path else "Unknown path"
             ) from e
 
     @property
