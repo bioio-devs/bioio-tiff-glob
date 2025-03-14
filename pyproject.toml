@@ -21,9 +21,9 @@ authors = [
 classifiers = [
   "Development Status :: 4 - Beta",
   "Natural Language :: English",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
 ]
 dynamic = ["version"]
 dependencies = [
@@ -35,7 +35,7 @@ dependencies = [
   "tifffile>=2022.4.22",
   "xarray>=0.16.1",
   #zarr pinned since breaking changes in 3.0 are available with python 3.11
-  "zarr>=2.6,<3.0.0", # for tifffile
+  "zarr>=2.6" # for tifffile
 ]
 
 [project.urls]
