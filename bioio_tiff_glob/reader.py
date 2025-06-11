@@ -13,7 +13,7 @@ import pandas as pd
 import xarray as xr
 from bioio_base import constants, dimensions, exceptions, io, reader, types
 from fsspec.spec import AbstractFileSystem
-from tifffile import TiffFile, TiffFileError, TiffSequence, imread
+from tifffile import TiffFile, TiffSequence, imread
 from tifffile.tifffile import TiffTags
 
 from . import utils as metadata_utils
@@ -126,8 +126,12 @@ class Reader(reader.Reader):
                     Reader(glob_in=[path], **kwargs)
                     return True
 
-        except (TiffFileError, TypeError) or exceptions.UnsupportedFileFormatError:
-            return False
+        except Exception as e:
+            raise exceptions.UnsupportedFileFormatError(
+                "bioio-tiff-glob",
+                path,
+                "TiffFile could not be opened or is not a valid TIFF file. " + str(e),
+            )
 
     def __init__(
         self,
