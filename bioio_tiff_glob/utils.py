@@ -17,7 +17,7 @@ def generate_ome_image_id(image_id: Union[str, int]) -> str:
     ome_image_id: str
         The OME standard for image IDs.
     """
-    return f"Image:{image_id}"
+    return f"Image:{image_id}"  # noqa: E231
 
 
 def generate_ome_channel_id(image_id: str, channel_id: Union[str, int]) -> str:
@@ -47,7 +47,7 @@ def generate_ome_channel_id(image_id: str, channel_id: Union[str, int]) -> str:
     """
     # Remove the prefix 'Image:' to get just the index
     image_index = image_id.replace("Image:", "")
-    return f"Channel:{image_index}:{channel_id}"
+    return f"Channel:{image_index}:{channel_id}"  # noqa: E231
 
 
 def generate_ome_instrument_id(instrument_id: Union[str, int]) -> str:
@@ -64,7 +64,7 @@ def generate_ome_instrument_id(instrument_id: Union[str, int]) -> str:
     ome_instrument_id: str
         The OME standard for instrument IDs.
     """
-    return f"Instrument:{instrument_id}"
+    return f"Instrument:{instrument_id}"  # noqa: E231
 
 
 def generate_ome_detector_id(detector_id: Union[str, int]) -> str:
@@ -81,4 +81,4 @@ def generate_ome_detector_id(detector_id: Union[str, int]) -> str:
     ome_detector_id: str
         The OME standard for detector IDs.
     """
-    return f"Detector:{detector_id}"
+    return f"Detector:{detector_id}"  # noqa: E231
