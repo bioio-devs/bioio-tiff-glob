@@ -103,6 +103,7 @@ class Reader(reader.Reader):
 
     mm_reader = TiffGlobReader(files, indexer=mm_indexer)
     """
+
     _xarray_dask_data: Optional["xr.DataArray"] = None
     _xarray_data: Optional["xr.DataArray"] = None
     _mosaic_xarray_dask_data: Optional["xr.DataArray"] = None
